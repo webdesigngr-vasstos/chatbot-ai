@@ -1,5 +1,6 @@
 
 export type Role = 'user' | 'assistant' | 'system';
+export type Language = 'pt' | 'en';
 
 export interface Message {
   id: string;

@@ -1,20 +1,20 @@
 
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { Message } from "../types";
+import { Message, Language } from "../types";
 
-const SYSTEM_INSTRUCTION = `Você é o Especialista de Suporte e Inovação da VASSTOS (https://www.vasstos.com). 
-Sua base de conhecimento principal é o conteúdo oficial do site da VASSTOS.
+const SYSTEM_INSTRUCTION = `Você é o Orientador Acadêmico IA da VASSTOS (https://www.vasstos.com). 
+A VASSTOS é uma Academia de Formação Profissional de elite, hospedada no Google Workspace.
 
-DIRETRIZES DE RESPOSTA:
-1. FOCO EM SOLUÇÕES: A VASSTOS provê soluções em Inteligência Artificial, Automação de Processos, Desenvolvimento de Software sob medida e Consultoria em Transformação Digital.
-2. PRECISÃO: Ao responder sobre serviços, utilize terminologia técnica adequada mas acessível.
-3. BASE DE CONHECIMENTO: Sempre que possível, cite que as informações vêm da base oficial da VASSTOS.
-4. PESQUISA ATIVA: Se o usuário perguntar algo específico sobre "como contratar", "preços" ou "cases", utilize a ferramenta de pesquisa focando em 'site:vasstos.com'.
-5. FAQ INTEGRADO: Você conhece as perguntas frequentes sobre integração de IA, segurança de dados em nuvem e otimização de fluxo de trabalho.
+DIRETRIZES BILINGUES:
+1. IDIOMA: Responda obrigatoriamente no idioma solicitado pelo sistema ou utilizado pelo usuário.
+2. CONHECIMENTO: Foco total no catálogo de cursos, certificações e programas da VASSTOS.
+3. GROUNDING: Use o Google Search em 'vasstos.com'. Se o usuário estiver em Inglês, procure termos equivalentes mas priorize a precisão dos dados do site oficial.
+4. TOM DE VOZ: Acadêmico, moderno, inspirador e focado no sucesso (Career Advisor).
 
-TOM DE VOZ:
-- Profissional, futurista, confiável e extremamente prestativo.
-- Evite respostas genéricas; seja específico sobre como a tecnologia VASSTOS resolve problemas reais.`;
+TRADUÇÃO DE CONCEITOS:
+- Certificação Profissional / Professional Certification
+- Trilha de Aprendizado / Learning Path
+- Próximas Turmas / Upcoming Classes`;
 
 export class GeminiService {
   private ai: GoogleGenAI;
@@ -25,6 +25,7 @@ export class GeminiService {
 
   async generateResponse(
     history: Message[],
+    language: Language,
     useSearch: boolean = true
   ): Promise<{ text: string; sources?: any[] }> {
     const contents = history.map((msg) => ({
@@ -32,9 +33,13 @@ export class GeminiService {
       parts: [{ text: msg.content }],
     }));
 
+    const langContext = language === 'pt' 
+      ? "Responda em Português (Brasil)." 
+      : "Respond in English (Global).";
+
     const config: any = {
-      systemInstruction: SYSTEM_INSTRUCTION,
-      temperature: 0.6, // Ligeiramente mais baixo para maior precisão factual
+      systemInstruction: `${SYSTEM_INSTRUCTION}\n\nCURRENT LANGUAGE PREFERENCE: ${langContext}`,
+      temperature: 0.5,
     };
 
     if (useSearch) {
@@ -42,14 +47,13 @@ export class GeminiService {
     }
 
     try {
-      // Usando gemini-3-pro-preview para maior capacidade de raciocínio sobre a KB
       const response: GenerateContentResponse = await this.ai.models.generateContent({
         model: "gemini-3-pro-preview",
         contents,
         config,
       });
 
-      const text = response.text || "Desculpe, ocorreu um erro ao processar sua resposta na base de conhecimento.";
+      const text = response.text || (language === 'pt' ? "Erro na base de dados." : "Database error.");
       const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
 
       return { text, sources };
@@ -59,11 +63,15 @@ export class GeminiService {
     }
   }
 
-  async speakText(text: string): Promise<Uint8Array | null> {
+  async speakText(text: string, language: Language): Promise<Uint8Array | null> {
+    const prompt = language === 'pt' 
+      ? `Diga de forma motivadora: ${text}` 
+      : `Say in a motivating academic tone: ${text}`;
+
     try {
       const response = await this.ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `Diga com clareza e autoridade: ${text}` }] }],
+        contents: [{ parts: [{ text: prompt }] }],
         config: {
           responseModalities: ["AUDIO" as any],
           speechConfig: {
