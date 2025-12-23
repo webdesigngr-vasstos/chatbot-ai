@@ -1,0 +1,7 @@
+{
+  "name": "VASSTOS AI Assistant",
+  "description": "A high-end, intelligent virtual assistant for VASSTOS, providing information, support, and interactive AI capabilities.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
