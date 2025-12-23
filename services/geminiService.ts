@@ -11,6 +11,11 @@ DIRETRIZES BILINGUES:
 3. GROUNDING: Use o Google Search em 'vasstos.com'. Se o usuário estiver em Inglês, procure termos equivalentes mas priorize a precisão dos dados do site oficial.
 4. TOM DE VOZ: Acadêmico, moderno, inspirador e focado no sucesso (Career Advisor).
 
+FORMATO DE RESPOSTA:
+- Sempre termine sua resposta com exatamente 3 ou 4 sugestões de perguntas curtas de acompanhamento que o usuário possa querer fazer a seguir.
+- Envolva estas sugestões no formato: <suggestions>Pergunta 1|Pergunta 2|Pergunta 3</suggestions>
+- Mantenha as sugestões extremamente curtas (máximo 4-5 palavras).
+
 TRADUÇÃO DE CONCEITOS:
 - Certificação Profissional / Professional Certification
 - Trilha de Aprendizado / Learning Path
@@ -27,7 +32,7 @@ export class GeminiService {
     history: Message[],
     language: Language,
     useSearch: boolean = true
-  ): Promise<{ text: string; sources?: any[] }> {
+  ): Promise<{ text: string; sources?: any[]; suggestions?: string[] }> {
     const contents = history.map((msg) => ({
       role: msg.role === "assistant" ? "model" : "user",
       parts: [{ text: msg.content }],
@@ -39,7 +44,7 @@ export class GeminiService {
 
     const config: any = {
       systemInstruction: `${SYSTEM_INSTRUCTION}\n\nCURRENT LANGUAGE PREFERENCE: ${langContext}`,
-      temperature: 0.5,
+      temperature: 0.7,
     };
 
     if (useSearch) {
@@ -53,10 +58,20 @@ export class GeminiService {
         config,
       });
 
-      const text = response.text || (language === 'pt' ? "Erro na base de dados." : "Database error.");
+      let rawText = response.text || (language === 'pt' ? "Erro na base de dados." : "Database error.");
+      
+      // Parse suggestions
+      let suggestions: string[] = [];
+      const suggestionMatch = rawText.match(/<suggestions>(.*?)<\/suggestions>/);
+      
+      if (suggestionMatch) {
+        suggestions = suggestionMatch[1].split('|').map(s => s.trim());
+        rawText = rawText.replace(/<suggestions>.*?<\/suggestions>/, '').trim();
+      }
+
       const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
 
-      return { text, sources };
+      return { text: rawText, sources, suggestions };
     } catch (error) {
       console.error("Gemini API Error:", error);
       throw error;
